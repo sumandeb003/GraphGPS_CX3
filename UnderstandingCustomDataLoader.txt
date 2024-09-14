@@ -1,0 +1,1369 @@
+class ZINC(InMemoryDataset):
+	
+    url = 'https://www.dropbox.com/s/feo9qle74kg48gy/molecules.zip?dl=1'
+    split_url = ('https://raw.githubusercontent.com/graphdeeplearning/'
+                 'benchmarking-gnns/master/data/molecules/{}.index')
+
+
+	#Copied from ZINC
+    def __init__(
+        self,
+        root: str,
+        subset: bool = False,
+        split: str = 'train',
+        transform: Optional[Callable] = None,
+        pre_transform: Optional[Callable] = None,
+        pre_filter: Optional[Callable] = None,
+        force_reload: bool = False,
+    ) -> None:
+        self.subset = subset
+        assert split in ['train', 'val', 'test']
+        super().__init__(root, transform, pre_transform, pre_filter,
+                         force_reload=force_reload)
+        path = osp.join(self.processed_dir, f'{split}.pt')
+        self.load(path)
+		
+		
+	#Copied from InMemoryDataset
+	def __init__(
+        self,
+        root: Optional[str] = None,
+        transform: Optional[Callable] = None,
+        pre_transform: Optional[Callable] = None,
+        pre_filter: Optional[Callable] = None,
+        log: bool = True,
+        force_reload: bool = False,
+    ) -> None:
+        super().__init__(root, transform, pre_transform, pre_filter, log,
+                         force_reload)
+
+        self._data: Optional[BaseData] = None
+        self.slices: Optional[Dict[str, Tensor]] = None
+        self._data_list: Optional[MutableSequence[Optional[BaseData]]] = None
+		
+	#Copied from Dataset
+	def __init__(
+        self,
+        root: Optional[str] = None,
+        transform: Optional[Callable] = None,
+        pre_transform: Optional[Callable] = None,
+        pre_filter: Optional[Callable] = None,
+        log: bool = True,
+        force_reload: bool = False,
+    ) -> None:
+        super().__init__()
+
+        if isinstance(root, str):
+            root = osp.expanduser(fs.normpath(root))
+
+        self.root = root or MISSING
+        self.transform = transform
+        self.pre_transform = pre_transform
+        self.pre_filter = pre_filter
+        self.log = log
+        self._indices: Optional[Sequence] = None
+        self.force_reload = force_reload
+
+        if self.has_download:
+            self._download()
+
+        if self.has_process:
+            self._process()
+
+
+	#Copied from ZINC
+    @property
+    def raw_file_names(self) -> List[str]:
+        return [
+            'train.pickle', 'val.pickle', 'test.pickle', 'train.index',
+            'val.index', 'test.index'
+        ]
+		
+		
+		
+	#Copied from Dataset
+	@property
+    def raw_file_names(self) -> Union[str, List[str], Tuple[str, ...]]:
+        r"""The name of the files in the :obj:`self.raw_dir` folder that must
+        be present in order to skip downloading.
+        """
+        raise NotImplementedError
+
+
+	#Copied from ZINC
+    @property
+    def processed_dir(self) -> str:
+        name = 'subset' if self.subset else 'full'
+        return osp.join(self.root, name, 'processed')
+	
+	
+	#Copied from Dataset
+	@property
+    def processed_dir(self) -> str:
+        return osp.join(self.root, 'processed')
+
+
+	#Copied from ZINC
+    @property
+    def processed_file_names(self) -> List[str]:
+        return ['train.pt', 'val.pt', 'test.pt']
+		
+		
+	#Copied from Dataset
+	@property
+    def processed_file_names(self) -> Union[str, List[str], Tuple[str, ...]]:
+        r"""The name of the files in the :obj:`self.processed_dir` folder that
+        must be present in order to skip processing.
+        """
+        raise NotImplementedError
+
+
+	#Copied from ZINC
+    def download(self) -> None:
+        fs.rm(self.raw_dir)
+        path = download_url(self.url, self.root)
+        extract_zip(path, self.root)
+        os.rename(osp.join(self.root, 'molecules'), self.raw_dir)
+        os.unlink(path)
+
+        for split in ['train', 'val', 'test']:
+            download_url(self.split_url.format(split), self.raw_dir)
+
+
+	#Copied from Dataset
+	def download(self) -> None:
+        r"""Downloads the dataset to the :obj:`self.raw_dir` folder."""
+        raise NotImplementedError
+		
+	#Copied from Dataset
+	def process(self) -> None:
+        r"""Processes the dataset to the :obj:`self.processed_dir` folder."""
+        raise NotImplementedError
+
+	#Copied from ZINC
+    def process(self) -> None:
+        for split in ['train', 'val', 'test']:
+            with open(osp.join(self.raw_dir, f'{split}.pickle'), 'rb') as f:
+                mols = pickle.load(f)
+
+            indices = list(range(len(mols)))
+
+            if self.subset:
+                with open(osp.join(self.raw_dir, f'{split}.index')) as f:
+                    indices = [int(x) for x in f.read()[:-1].split(',')]
+
+            pbar = tqdm(total=len(indices))
+            pbar.set_description(f'Processing {split} dataset')
+
+            data_list = []
+            for idx in indices:
+                mol = mols[idx]
+
+                x = mol['atom_type'].to(torch.long).view(-1, 1)
+                y = mol['logP_SA_cycle_normalized'].to(torch.float)
+
+                adj = mol['bond_type']
+                edge_index = adj.nonzero(as_tuple=False).t().contiguous()
+                edge_attr = adj[edge_index[0], edge_index[1]].to(torch.long)
+
+                data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr,
+                            y=y)
+
+                if self.pre_filter is not None and not self.pre_filter(data):
+                    continue
+
+                if self.pre_transform is not None:
+                    data = self.pre_transform(data)
+
+                data_list.append(data)
+                pbar.update(1)
+
+            pbar.close()
+
+            self.save(data_list, osp.join(self.processed_dir, f'{split}.pt'))
+			
+	
+	#Copied from InmemoryDataset
+	@property 
+    def num_classes(self) -> int:
+        if self.transform is None:
+            return self._infer_num_classes(self._data.y)
+        return super().num_classes
+		
+	#Copied from Dataset
+	@property
+    def num_classes(self) -> int:
+        r"""Returns the number of classes in the dataset."""
+        # We iterate over the dataset and collect all labels to determine the
+        # maximum number of classes. Importantly, in rare cases, `__getitem__`
+        # may produce a tuple of data objects (e.g., when used in combination
+        # with `RandomLinkSplit`, so we take care of this case here as well:
+        data_list = _get_flattened_data_list([data for data in self])
+        if 'y' in data_list[0] and isinstance(data_list[0].y, Tensor):
+            y = torch.cat([data.y for data in data_list if 'y' in data], dim=0)
+        else:
+            y = torch.as_tensor([data.y for data in data_list if 'y' in data])
+
+        # Do not fill cache for `InMemoryDataset`:
+        if hasattr(self, '_data_list') and self._data_list is not None:
+            self._data_list = self.len() * [None]
+        return self._infer_num_classes(y)
+		
+	
+	#Copied from InmemoryDataset
+	def len(self) -> int:
+        if self.slices is None:
+            return 1
+        for _, value in nested_iter(self.slices):
+            return len(value) - 1
+        return 0
+		
+		
+	#Copied from Dataset
+	def len(self) -> int:
+        r"""Returns the number of data objects stored in the dataset."""
+        raise NotImplementedError
+		
+	#Copied from InmemoryDataset
+	def get(self, idx: int) -> BaseData:
+        # TODO (matthias) Avoid unnecessary copy here.
+        if self.len() == 1:
+            return copy.copy(self._data)
+
+        if not hasattr(self, '_data_list') or self._data_list is None:
+            self._data_list = self.len() * [None]
+        elif self._data_list[idx] is not None:
+            return copy.copy(self._data_list[idx])
+
+        data = separate(
+            cls=self._data.__class__,
+            batch=self._data,
+            idx=idx,
+            slice_dict=self.slices,
+            decrement=False,
+        )
+
+        self._data_list[idx] = copy.copy(data)
+
+        return data
+		
+	#Copied from Dataset
+	def get(self, idx: int) -> BaseData:
+        r"""Gets the data object at index :obj:`idx`."""
+        raise NotImplementedError
+		
+	
+	#Copied from InmemoryDataset	
+	@classmethod
+    def save(cls, data_list: Sequence[BaseData], path: str) -> None:
+        r"""Saves a list of data objects to the file path :obj:`path`."""
+        data, slices = cls.collate(data_list)
+        fs.torch_save((data.to_dict(), slices, data.__class__), path)
+		
+	
+	#Copied from InmemoryDataset
+	def load(self, path: str, data_cls: Type[BaseData] = Data) -> None:
+        r"""Loads the dataset from the file path :obj:`path`."""
+        out = fs.torch_load(path)
+        assert isinstance(out, tuple)
+        assert len(out) == 2 or len(out) == 3
+        if len(out) == 2:  # Backward compatibility.
+            data, self.slices = out
+        else:
+            data, self.slices, data_cls = out
+
+        if not isinstance(data, dict):  # Backward compatibility.
+            self.data = data
+        else:
+            self.data = data_cls.from_dict(data)
+			
+		
+	#Copied from InMemoryDataset
+	@staticmethod
+    def collate(
+        data_list: Sequence[BaseData],
+    ) -> Tuple[BaseData, Optional[Dict[str, Tensor]]]:
+        r"""Collates a list of :class:`~torch_geometric.data.Data` or
+        :class:`~torch_geometric.data.HeteroData` objects to the internal
+        storage format of :class:`~torch_geometric.data.InMemoryDataset`.
+        """
+        if len(data_list) == 1:
+            return data_list[0], None
+
+        data, slices, _ = collate(
+            data_list[0].__class__,
+            data_list=data_list,
+            increment=False,
+            add_batch=False,
+        )
+
+        return data, slices
+		
+	#Copied from InmemoryDataset
+	def copy(self, idx: Optional[IndexType] = None) -> 'InMemoryDataset':
+        r"""Performs a deep-copy of the dataset. If :obj:`idx` is not given,
+        will clone the full dataset. Otherwise, will only clone a subset of the
+        dataset from indices :obj:`idx`.
+        Indices can be slices, lists, tuples, and a :obj:`torch.Tensor` or
+        :obj:`np.ndarray` of type long or bool.
+        """
+        if idx is None:
+            data_list = [self.get(i) for i in self.indices()]
+        else:
+            data_list = [self.get(i) for i in self.index_select(idx).indices()]
+
+        dataset = copy.copy(self)
+        dataset._indices = None
+        dataset._data_list = None
+        dataset.data, dataset.slices = self.collate(data_list)
+        return dataset
+		
+	
+	#Copied from InMemoryDataset
+	def to_on_disk_dataset(
+        self,
+        root: Optional[str] = None,
+        backend: str = 'sqlite',
+        log: bool = True,
+    ) -> 'torch_geometric.data.OnDiskDataset':
+        r"""Converts the :class:`InMemoryDataset` to a :class:`OnDiskDataset`
+        variant. Useful for distributed training and hardware instances with
+        limited amount of shared memory.
+
+        root (str, optional): Root directory where the dataset should be saved.
+            If set to :obj:`None`, will save the dataset in
+            :obj:`root/on_disk`.
+            Note that it is important to specify :obj:`root` to account for
+            different dataset splits. (optional: :obj:`None`)
+        backend (str): The :class:`Database` backend to use.
+            (default: :obj:`"sqlite"`)
+        log (bool, optional): Whether to print any console output while
+            processing the dataset. (default: :obj:`True`)
+        """
+        if root is None and (self.root is None or not osp.exists(self.root)):
+            raise ValueError(f"The root directory of "
+                             f"'{self.__class__.__name__}' is not specified. "
+                             f"Please pass in 'root' when creating on-disk "
+                             f"datasets from it.")
+
+        root = root or osp.join(self.root, 'on_disk')
+
+        in_memory_dataset = self
+        ref_data = in_memory_dataset.get(0)
+        if not isinstance(ref_data, Data):
+            raise NotImplementedError(
+                f"`{self.__class__.__name__}.to_on_disk_dataset()` is "
+                f"currently only supported on homogeneous graphs")
+
+        # Parse the schema ====================================================
+
+        schema: Dict[str, Any] = {}
+        for key, value in ref_data.to_dict().items():
+            if isinstance(value, (int, float, str)):
+                schema[key] = value.__class__
+            elif isinstance(value, Tensor) and value.dim() == 0:
+                schema[key] = dict(dtype=value.dtype, size=(-1, ))
+            elif isinstance(value, Tensor):
+                size = list(value.size())
+                size[ref_data.__cat_dim__(key, value)] = -1
+                schema[key] = dict(dtype=value.dtype, size=tuple(size))
+            else:
+                schema[key] = object
+
+        # Create the on-disk dataset ==========================================
+
+        class OnDiskDataset(torch_geometric.data.OnDiskDataset):
+            def __init__(
+                self,
+                root: str,
+                transform: Optional[Callable] = None,
+            ):
+                super().__init__(
+                    root=root,
+                    transform=transform,
+                    backend=backend,
+                    schema=schema,
+                )
+
+            def process(self):
+                _iter = [
+                    in_memory_dataset.get(i)
+                    for i in in_memory_dataset.indices()
+                ]
+                if log:  # pragma: no cover
+                    _iter = tqdm(_iter, desc='Converting to OnDiskDataset')
+
+                data_list: List[Data] = []
+                for i, data in enumerate(_iter):
+                    data_list.append(data)
+                    if i + 1 == len(in_memory_dataset) or (i + 1) % 1000 == 0:
+                        self.extend(data_list)
+                        data_list = []
+
+            def serialize(self, data: Data) -> Dict[str, Any]:
+                return data.to_dict()
+
+            def deserialize(self, data: Dict[str, Any]) -> Data:
+                return Data.from_dict(data)
+
+            def __repr__(self) -> str:
+                arg_repr = str(len(self)) if len(self) > 1 else ''
+                return (f'OnDisk{in_memory_dataset.__class__.__name__}('
+                        f'{arg_repr})')
+
+        return OnDiskDataset(root, transform=in_memory_dataset.transform)
+		
+		
+	#Copied from Dataset
+	def __repr__(self) -> str:
+        arg_repr = str(len(self)) if len(self) > 1 else ''
+        return f'{self.__class__.__name__}({arg_repr})'
+		
+		
+	#Copied from InMemoryDataset
+	@property
+    def data(self) -> Any:
+        msg1 = ("It is not recommended to directly access the internal "
+                "storage format `data` of an 'InMemoryDataset'.")
+        msg2 = ("The given 'InMemoryDataset' only references a subset of "
+                "examples of the full dataset, but 'data' will contain "
+                "information of the full dataset.")
+        msg3 = ("The data of the dataset is already cached, so any "
+                "modifications to `data` will not be reflected when accessing "
+                "its elements. Clearing the cache now by removing all "
+                "elements in `dataset._data_list`.")
+        msg4 = ("If you are absolutely certain what you are doing, access the "
+                "internal storage via `InMemoryDataset._data` instead to "
+                "suppress this warning. Alternatively, you can access stacked "
+                "individual attributes of every graph via "
+                "`dataset.{attr_name}`.")
+
+        msg = msg1
+        if self._indices is not None:
+            msg += f' {msg2}'
+        if self._data_list is not None:
+            msg += f' {msg3}'
+            self._data_list = None
+        msg += f' {msg4}'
+
+        warnings.warn(msg)
+
+        return self._data
+		
+		
+	#Copied from InMemoryDataset
+	@data.setter
+    def data(self, value: Any):
+        self._data = value
+        self._data_list = None
+
+
+	#Copied from InMemoryDataset
+    def __getattr__(self, key: str) -> Any:
+        data = self.__dict__.get('_data')
+        if isinstance(data, Data) and key in data:
+            if self._indices is None and data.__inc__(key, data[key]) == 0:
+                return data[key]
+            else:
+                data_list = [self.get(i) for i in self.indices()]
+                return Batch.from_data_list(data_list)[key]
+
+        raise AttributeError(f"'{self.__class__.__name__}' object has no "
+                             f"attribute '{key}'")
+
+
+	#Copied from InMemoryDataset
+    def to(self, device: Union[int, str]) -> 'InMemoryDataset':
+        r"""Performs device conversion of the whole dataset."""
+        if self._indices is not None:
+            raise ValueError("The given 'InMemoryDataset' only references a "
+                             "subset of examples of the full dataset")
+        if self._data_list is not None:
+            raise ValueError("The data of the dataset is already cached")
+        self._data.to(device)
+        return self
+
+
+	#Copied from InMemoryDataset
+    def cpu(self, *args: str) -> 'InMemoryDataset':
+        r"""Moves the dataset to CPU memory."""
+        return self.to(torch.device('cpu'))
+
+
+	#Copied from InMemoryDataset
+    def cuda(
+        self,
+        device: Optional[Union[int, str]] = None,
+    ) -> 'InMemoryDataset':
+        r"""Moves the dataset toto CUDA memory."""
+        if isinstance(device, int):
+            device = f'cuda:{int}'
+        elif device is None:
+            device = 'cuda'
+        return self.to(device)
+	
+	$Copied from Dataset
+	def indices(self) -> Sequence:
+        return range(self.len()) if self._indices is None else self._indices
+
+
+	#Copied from Dataset
+    @property
+    def raw_dir(self) -> str:
+        return osp.join(self.root, 'raw')
+		
+	
+	#Copied from Dataset
+	@property
+    def num_node_features(self) -> int:
+        r"""Returns the number of features per node in the dataset."""
+        data = self[0]
+        # Do not fill cache for `InMemoryDataset`:
+        if hasattr(self, '_data_list') and self._data_list is not None:
+            self._data_list[0] = None
+        data = data[0] if isinstance(data, tuple) else data
+        if hasattr(data, 'num_node_features'):
+            return data.num_node_features
+        raise AttributeError(f"'{data.__class__.__name__}' object has no "
+                             f"attribute 'num_node_features'")
+
+
+	#Copied from Dataset
+    @property
+    def num_features(self) -> int:
+        r"""Returns the number of features per node in the dataset.
+        Alias for :py:attr:`~num_node_features`.
+        """
+        return self.num_node_features
+
+
+	#Copied from Dataset
+    @property
+    def num_edge_features(self) -> int:
+        r"""Returns the number of features per edge in the dataset."""
+        data = self[0]
+        # Do not fill cache for `InMemoryDataset`:
+        if hasattr(self, '_data_list') and self._data_list is not None:
+            self._data_list[0] = None
+        data = data[0] if isinstance(data, tuple) else data
+        if hasattr(data, 'num_edge_features'):
+            return data.num_edge_features
+        raise AttributeError(f"'{data.__class__.__name__}' object has no "
+                             f"attribute 'num_edge_features'")
+
+
+	#Copied from Dataset
+    def _infer_num_classes(self, y: Optional[Tensor]) -> int:
+        if y is None:
+            return 0
+        elif y.numel() == y.size(0) and not torch.is_floating_point(y):
+            return int(y.max()) + 1
+        elif y.numel() == y.size(0) and torch.is_floating_point(y):
+            num_classes = torch.unique(y).numel()
+            if num_classes > 2:
+                warnings.warn("Found floating-point labels while calling "
+                              "`dataset.num_classes`. Returning the number of "
+                              "unique elements. Please make sure that this "
+                              "is expected before proceeding.")
+            return num_classes
+        else:
+            return y.size(-1)
+			
+			
+	#Copied from Dataset
+	@property
+    def raw_paths(self) -> List[str]:
+        r"""The absolute filepaths that must be present in order to skip
+        downloading.
+        """
+        files = self.raw_file_names
+        # Prevent a common source of error in which `file_names` are not
+        # defined as a property.
+        if isinstance(files, Callable):
+            files = files()
+        return [osp.join(self.raw_dir, f) for f in to_list(files)]
+
+	#Copied from Dataset
+    @property
+    def processed_paths(self) -> List[str]:
+        r"""The absolute filepaths that must be present in order to skip
+        processing.
+        """
+        files = self.processed_file_names
+        # Prevent a common source of error in which `file_names` are not
+        # defined as a property.
+        if isinstance(files, Callable):
+            files = files()
+        return [osp.join(self.processed_dir, f) for f in to_list(files)]
+
+
+	#Copied from Dataset
+    @property
+    def has_download(self) -> bool:
+        r"""Checks whether the dataset defines a :meth:`download` method."""
+        return overrides_method(self.__class__, 'download')
+
+
+	#Copied from Dataset
+    def _download(self):
+        if files_exist(self.raw_paths):  # pragma: no cover
+            return
+
+        fs.makedirs(self.raw_dir, exist_ok=True)
+        self.download()
+
+
+	#Copied from Dataset
+    @property
+    def has_process(self) -> bool:
+        r"""Checks whether the dataset defines a :meth:`process` method."""
+        return overrides_method(self.__class__, 'process')
+
+
+	#Copied from Dataset
+    def _process(self):
+        f = osp.join(self.processed_dir, 'pre_transform.pt')
+        if osp.exists(f) and torch.load(f, weights_only=False) != _repr(
+                self.pre_transform):
+            warnings.warn(
+                "The `pre_transform` argument differs from the one used in "
+                "the pre-processed version of this dataset. If you want to "
+                "make use of another pre-processing technique, pass "
+                "`force_reload=True` explicitly to reload the dataset.")
+
+        f = osp.join(self.processed_dir, 'pre_filter.pt')
+        if osp.exists(f) and torch.load(f, weights_only=False) != _repr(
+                self.pre_filter):
+            warnings.warn(
+                "The `pre_filter` argument differs from the one used in "
+                "the pre-processed version of this dataset. If you want to "
+                "make use of another pre-fitering technique, pass "
+                "`force_reload=True` explicitly to reload the dataset.")
+
+        if not self.force_reload and files_exist(self.processed_paths):
+            return
+
+        if self.log and 'pytest' not in sys.modules:
+            print('Processing...', file=sys.stderr)
+
+        fs.makedirs(self.processed_dir, exist_ok=True)
+        self.process()
+
+        path = osp.join(self.processed_dir, 'pre_transform.pt')
+        fs.torch_save(_repr(self.pre_transform), path)
+        path = osp.join(self.processed_dir, 'pre_filter.pt')
+        fs.torch_save(_repr(self.pre_filter), path)
+
+        if self.log and 'pytest' not in sys.modules:
+            print('Done!', file=sys.stderr)
+
+
+
+	#Copied from Dataset
+    def __len__(self) -> int:
+        r"""The number of examples in the dataset."""
+        return len(self.indices())
+
+
+	#Copied from Dataset
+    def __getitem__(
+        self,
+        idx: Union[int, np.integer, IndexType],
+    ) -> Union['Dataset', BaseData]:
+        r"""In case :obj:`idx` is of type integer, will return the data object
+        at index :obj:`idx` (and transforms it in case :obj:`transform` is
+        present).
+        In case :obj:`idx` is a slicing object, *e.g.*, :obj:`[2:5]`, a list, a
+        tuple, or a :obj:`torch.Tensor` or :obj:`np.ndarray` of type long or
+        bool, will return a subset of the dataset at the specified indices.
+        """
+        if (isinstance(idx, (int, np.integer))
+                or (isinstance(idx, Tensor) and idx.dim() == 0)
+                or (isinstance(idx, np.ndarray) and np.isscalar(idx))):
+
+            data = self.get(self.indices()[idx])
+            data = data if self.transform is None else self.transform(data)
+            return data
+
+        else:
+            return self.index_select(idx)
+			
+			
+	
+	#Copied from Dataset	
+	def __iter__(self) -> Iterator[BaseData]:
+        for i in range(len(self)):
+            yield self[i]
+
+	#Copied from Dataset
+    def index_select(self, idx: IndexType) -> 'Dataset':
+        r"""Creates a subset of the dataset from specified indices :obj:`idx`.
+        Indices :obj:`idx` can be a slicing object, *e.g.*, :obj:`[2:5]`, a
+        list, a tuple, or a :obj:`torch.Tensor` or :obj:`np.ndarray` of type
+        long or bool.
+        """
+        indices = self.indices()
+
+        if isinstance(idx, slice):
+            start, stop, step = idx.start, idx.stop, idx.step
+            # Allow floating-point slicing, e.g., dataset[:0.9]
+            if isinstance(start, float):
+                start = round(start * len(self))
+            if isinstance(stop, float):
+                stop = round(stop * len(self))
+            idx = slice(start, stop, step)
+
+            indices = indices[idx]
+
+        elif isinstance(idx, Tensor) and idx.dtype == torch.long:
+            return self.index_select(idx.flatten().tolist())
+
+        elif isinstance(idx, Tensor) and idx.dtype == torch.bool:
+            idx = idx.flatten().nonzero(as_tuple=False)
+            return self.index_select(idx.flatten().tolist())
+
+        elif isinstance(idx, np.ndarray) and idx.dtype == np.int64:
+            return self.index_select(idx.flatten().tolist())
+
+        elif isinstance(idx, np.ndarray) and idx.dtype == bool:
+            idx = idx.flatten().nonzero()[0]
+            return self.index_select(idx.flatten().tolist())
+
+        elif isinstance(idx, Sequence) and not isinstance(idx, str):
+            indices = [indices[i] for i in idx]
+
+        else:
+            raise IndexError(
+                f"Only slices (':'), list, tuples, torch.tensor and "
+                f"np.ndarray of dtype long or bool are valid indices (got "
+                f"'{type(idx).__name__}')")
+
+        dataset = copy.copy(self)
+        dataset._indices = indices
+        return dataset
+
+
+
+	#Copied from Dataset
+    def shuffle(
+        self,
+        return_perm: bool = False,
+    ) -> Union['Dataset', Tuple['Dataset', Tensor]]:
+        r"""Randomly shuffles the examples in the dataset.
+
+        Args:
+            return_perm (bool, optional): If set to :obj:`True`, will also
+                return the random permutation used to shuffle the dataset.
+                (default: :obj:`False`)
+        """
+        perm = torch.randperm(len(self))
+        dataset = self.index_select(perm)
+        return (dataset, perm) if return_perm is True else dataset
+
+
+	#Copied from Dataset
+	def get_summary(self) -> Any:
+        r"""Collects summary statistics for the dataset."""
+        from torch_geometric.data.summary import Summary
+        return Summary.from_dataset(self)
+
+	#Copied from Dataset
+    def print_summary(self, fmt: str = "psql") -> None:
+        r"""Prints summary statistics of the dataset to the console.
+
+        Args:
+            fmt (str, optional): Summary tables format. Available table formats
+                can be found `here <https://github.com/astanin/python-tabulate?
+                tab=readme-ov-file#table-format>`__. (default: :obj:`"psql"`)
+        """
+        print(self.get_summary().format(fmt=fmt))
+
+	#Copied from Dataset
+    def to_datapipe(self) -> Any:
+        r"""Converts the dataset into a :class:`torch.utils.data.DataPipe`.
+
+        The returned instance can then be used with :pyg:`PyG's` built-in
+        :class:`DataPipes` for baching graphs as follows:
+
+        .. code-block:: python
+
+            from torch_geometric.datasets import QM9
+
+            dp = QM9(root='./data/QM9/').to_datapipe()
+            dp = dp.batch_graphs(batch_size=2, drop_last=True)
+
+            for batch in dp:
+                pass
+
+        See the `PyTorch tutorial
+        <https://pytorch.org/data/main/tutorial.html>`_ for further background
+        on DataPipes.
+        """
+        from torch_geometric.data.datapipes import DatasetAdapter
+
+        return DatasetAdapter(self)
+		
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+./run/run_experiments.sh:20:    out_dir="results/${dataset}"  # <-- Set the output dir.
+./run/run_experiments.sh:21:    common_params="out_dir ${out_dir} ${cfg_overrides}"
+./run/run_experiments.sh:24:    echo "  output dir: ${out_dir}"
+Binary file ./graphgps/__pycache__/logger.cpython-310.pyc matches
+./graphgps/logger.py:281:        dict_to_json(stats, '{}/stats.json'.format(self.out_dir))
+./main.py:51:def custom_set_out_dir(cfg, cfg_fname, name_tag):
+./main.py:53:    Include the config filename and name_tag in the new :obj:`cfg.out_dir`.
+./main.py:63:    cfg.out_dir = os.path.join(cfg.out_dir, run_name)
+./main.py:73:    cfg.run_dir = os.path.join(cfg.out_dir, str(run_id))
+./main.py:122:    custom_set_out_dir(cfg, args.cfg_file, cfg.name_tag)
+./main.py:170:        agg_runs(cfg.out_dir, cfg.metric_best)
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX		
+#############################
+class Dataset
+#############################
+=========
+property:
+=========
+***self.root - Root directory where the raw and processed files of dataset will be saved.
+***raw_dir: Property that returns the path to the raw (downloaded) data directory.
+def raw_dir(self) -> str: 
+	return osp.join(self.root, 'raw')
+***raw_file_names: Abstract method that must be implemented in subclasses; Returns the names of raw files expected in the `raw_dir` folder. #def raw_dir(self) -> str: return osp.join(self.root, 'raw')
+***raw_paths: Property that returns the absolute file paths of raw files required to skip downloading
+#Copied from Dataset
+@property
+def raw_paths(self) -> List[str]:
+        r"""The absolute filepaths that must be present in order to skip
+        downloading.
+        """
+        files = self.raw_file_names
+        # Prevent a common source of error in which `file_names` are not
+        # defined as a property.
+        if isinstance(files, Callable):
+            files = files()
+        return [osp.join(self.raw_dir, f) for f in to_list(files)]
+**has_download: Checks whether the method `download` has been defined (The `_download` method checks if the property `raw_paths` returns False. If so, it executes the `download` method)
+##################################################################################################
+***processed_dir: Property that returns the path to the processed data directory.#Copied from ZINC
+    @property
+    def processed_dir(self) -> str:
+        name = 'subset' if self.subset else 'full'
+        return osp.join(self.root, name, 'processed')	
+	#Copied from Dataset
+	@property
+    def processed_dir(self) -> str:
+        return osp.join(self.root, 'processed')
+***processed_file_names: Abstract method that must be implemented in subclasses; Returns the names of processed files expected in the `processed_dir` folder.
+***processed_paths: Property that returns the absolute file paths of processed files required to skip processing
+	#Copied from Dataset
+    @property
+    def processed_paths(self) -> List[str]:
+        r"""The absolute filepaths that must be present in order to skip
+        processing.
+        """
+        files = self.processed_file_names
+        # Prevent a common source of error in which `file_names` are not
+        # defined as a property.
+        if isinstance(files, Callable):
+            files = files()
+        return [osp.join(self.processed_dir, f) for f in to_list(files)]
+**has_process: Checks whether the dataset defines the `process` method (The `_process` method checks if the property `processed_paths` returns False. If so, it executes the `process` method)
+################################################################################################
+*num_node_features: Property that returns the number of features per node in the dataset by inspecting the first data object.
+*num_features: Alias for `num_node_features`.
+*num_edge_features: Property that returns the number of features per edge in the dataset by inspecting the first data object.
+*num_classes: Property that returns the number of classes in the dataset by iterating over data objects and inspecting the `y` attribute.
+=====================
+functions or methods:
+=====================
+(CHECK)***__init__: If the property `has_download` returns True, it executes the `_download` method. If the property `has_process` returns True, it executes the `_process` method.
+(CHECK)***download: Abstract method that must be implemented in subclasses to handle downloading of the dataset to the `raw_dir` folder. #def raw_dir(self) -> str: return osp.join(self.root, 'raw')
+(CHECK)***process: Abstract method that must be implemented in subclasses to process the dataset and save it to the `processed_dir` folder.
+***_download: If the property `raw_paths` returns False i.e. if the `raw_file_names` are not found in `raw_dir`, it executes the `download` method.
+***_process: Handles the processing of the dataset, including checks for `pre_transform` and `pre_filter`. If the property `processed_paths` returns false i.e. `processed_file_names` do not exist in `processed_dir`, it executes the `process()` method.
+
+**len: Abstract method that must be implemented in subclasses; Returns the number of data objects stored in the dataset.
+**get: Abstract method that must be implemented in subclasses; Retrieves the data object at a specified index.
+**__getitem__: Retrieves a data object at the specified index and applies the `transform` if defined.
+**__iter__: Returns an iterator over the dataset.
+**index_select: Creates a subset of the dataset based on specified indices, which can be slices, lists, or tensors.
+**shuffle: Randomly shuffles the dataset and optionally returns the permutation used for shuffling.
+*get_summary: Collects and returns summary statistics for the dataset
+*print_summary: Prints summary statistics of the dataset in a specified format.
+indices: Returns a sequence of indices for the dataset
+_infer_num_classes: Infers the number of classes in the dataset based on the labels `y`
+__len__: Returns the length of the dataset by using `indices`.
+__repr__: Returns a string representation of the dataset showing its class name and the number of examples.
+to_datapipe: Converts the dataset into a torch.utils.data.DataPipe for further processing or batching.
+######################
+class InMemoryDataset:
+######################
+=========
+property:
+=========
+(Only defined and not implemented in class `Dataset`) raw_file_names: Only defined and not implemented
+(Only defined and not implemented in class `Dataset`) processed_file_names:  Only defined and not implemented
+(CHECK - Also defined and implemented in class `Dataset`) **num_classes: (overrides `num_classes` defined in class `Dataset`) Property that returns the number of classes in the dataset. If `transform` is not set, it uses `_infer_num_classes` on the data; otherwise, it defers to the superclass
+(CHECK - This function is defined 2 times in this `InMemoryDataset` class) data: This function is defined 2 times in this `InMemoryDataset` class. Getter and setter for accessing the internal `_data`. Issues warnings about directly accessing `_data` and offers safer alternatives.
+=====================
+functions or methods:
+=====================
+(CHECK)__init__(inherited from Dataset)
+(Only defined and not implemented in class `Dataset`) **len: Returns the number of data objects in the dataset by checking the length of `slices`. If `slices` is None, it returns 1.
+(Only defined and not implemented in class `Dataset`) **get: (Only defined and not implemented in class `Dataset`) Retrieves the data object at the specified index. If the dataset contains only one item, it returns a copy of `_data`. Uses `separate` to split the data based on `slices` if there are multiple data objects.
+(CHECK - Is it used in the custom dataset class?) save: Saves a list of data objects to a specified file path. Uses `collate` to merge the data objects into a single storage format and saves them using `fs.torch_save`.
+(CHECK - Is it used in the custom dataset class?) load: Loads the dataset from the specified file path. Handles backward compatibility with older formats and loads data into the internal _data attribute.
+(CHECK - Is it used in the custom dataset class?) collate: Combines a list of `Data` or `HeteroData` objects into the internal storage format used by `InMemoryDataset`. Returns a combined `data` object and `slices`.
+(CHECK - Is it used in the custom dataset class?) copy: Creates a deep copy of the dataset. If indices are specified, it copies only the specified subset of data.
+(CHECK - Is it used in the custom dataset class?) to_on_disk_dataset: Converts the `InMemoryDataset` to an `OnDiskDataset`, suitable for scenarios with limited shared memory or distributed training. Parses the data schema and creates an on-disk version of the dataset.
+(CHECK - Is it used in the custom dataset class?)__getattr__: Handles attribute access, allowing dynamic retrieval of data properties from _data. Returns stacked attributes of the dataset as a batch when accessed directly.
+to: Moves the dataset to a specified device (CPU or CUDA). Checks for the presence of cached data and raises an error if it conflicts with the move operation.
+cpu: Moves the dataset to CPU memory. Calls the `to` method with the CPU device.
+cuda: Moves the dataset to CUDA memory. Accepts an optional device argument specifying which CUDA device to use.
+###########
+class ZINC:
+###########
+=========
+property:
+=========
+raw_file_names: Returns the list of expected raw file names in the raw directory. Includes files like train.pickle, val.pickle, test.pickle, and corresponding .index files for each split.
+processed_dir: Returns the directory path for processed data. Returns self.root + 'subset'or'full' + 'processed'
+processed_file_names: Returns a list of processed file names expected in the processed directory. These are the files generated after processing: train.pt, val.pt, and test.pt.
+=====================
+functions or methods:
+=====================
+(CHECK - inherited from InMemoryDataset)__init__
+(CHECK - inherited from Dataset; only defined and not implemented in Dataset) ***download: Downloads the ZINC dataset from a specified URL and extracts it into the raw directory. Cleans up any existing raw data before downloading and unzipping the new files. Downloads additional .index files for training, validation and test splits of the dataset.
+(CHECK - inherited from Dataset; only defined and not implemented in Dataset) ***process: 
+
+self.subset - defined in custom dataset class ZINC
+self.processed_dir - defined in custom dataset class ZINC superseding its definition in class Dataset
+self.load - defined in class InMemoryDataset
+self.raw_dir - defined in class Dataset
+self.url - variable declared in custom-dataset class
+self.pre_filter - argument to custom-dataset class, InMemoryDataset class, Dataset class
+self.pre_transform - argument to custom-dataset class, InMemoryDataset class, Dataset class
+self.save - defined in class InMemoryDataset
+#############################
+
+Which form is the ZINC dataset in the URL?
+What is the form of the dataset in the raw_dir?
+Where is the raw_dir defined?
+
+#Complete
+def __init__(
+        self,
+        root: str,
+        subset: bool = False,
+        split: str = 'train',
+        transform: Optional[Callable] = None,
+        pre_transform: Optional[Callable] = None,
+        pre_filter: Optional[Callable] = None,
+        force_reload: bool = False,
+) -> None:
+        self.subset = subset #Copied from ZINC
+        assert split in ['train', 'val', 'test']                                    #Inherited from class ZINC
+        super().__init__()                                                          #Inherited from class Dataset
+
+        if isinstance(root, str):                                                   #Inherited from class Dataset
+            root = osp.expanduser(fs.normpath(root))                                #Inherited from class Dataset
+
+        self.root = root or MISSING                                                 #Inherited from class Dataset
+        self.transform = transform                                                  #Inherited from class Dataset
+        self.pre_transform = pre_transform                                          #Inherited from class Dataset
+        self.pre_filter = pre_filter                                                #Inherited from class Dataset
+        self.log = log                                                              #Inherited from class Dataset
+        self._indices: Optional[Sequence] = None                                    #Inherited from class Dataset
+        self.force_reload = force_reload                                            #Inherited from class Dataset
+
+        if self.has_download:                                                       #Inherited from class Dataset
+            self._download()                                                        #Inherited from class Dataset
+		
+		#Copied from Dataset
+		#def has_download(self) -> bool:
+        #	r"""Checks whether the dataset defines a :meth:`download` method."""
+        #	return overrides_method(self.__class__, 'download')
+		#Copied from Dataset
+		#def _download(self):
+		#	if files_exist(self.raw_paths):  # pragma: no cover
+		#		return
+		#	fs.makedirs(self.raw_dir, exist_ok=True)
+		#	self.download()
+		#Copied from Dataset
+		#@property
+		#def raw_paths(self) -> List[str]:
+		#	r"""The absolute filepaths that must be present in order to skip downloading."""
+		#	files = self.raw_file_names
+		#	# Prevent a common source of error in which `file_names` are not
+		#	# defined as a property.
+		#	if isinstance(files, Callable):
+		#		files = files()
+		#	return [osp.join(self.raw_dir, f) for f in to_list(files)]
+		#Copied from Dataset
+		#@property
+		#def raw_dir(self) -> str:
+		#	return osp.join(self.root, 'raw')
+        
+		if self.has_process:                                                        #Inherited from class Dataset
+            self._process()                                                         #Inherited from class Dataset
+
+        self._data: Optional[BaseData] = None                                       #Inherited from class InMemoryDataset
+        self.slices: Optional[Dict[str, Tensor]] = None                             #Inherited from class InMemoryDataset
+        self._data_list: Optional[MutableSequence[Optional[BaseData]]] = None       #Inherited from class InMemoryDataset
+        path = osp.join(self.processed_dir, f'{split}.pt')                          #Inherited from class ZINC
+        self.load(path)                                                             #Inherited from class ZINC
+		
+		
+############################################
+class `Dataset`
+############################################
+self.len()
+self._indices  - an optional argument of __init__()
+self._data_list
+self._data_list[0]
+self[0]
+data = self[0]; data = data[0];  data.num_node_features
+self.num_node_features
+len(self.indices())
+self.get(self.indices()[idx])
+self.slices
+
+hasattr(self, '_data_list')
+hasattr(data, 'num_node_features')
+hasattr(self, '_data_list')
+hasattr(data, 'num_edge_features')
+isinstance(data, tuple)
+
+
+###########################################
+ZINC dataset:
+###########################################
+0. def load_dataset_master(format, name, dataset_dir):
+    """
+    Master loader that controls loading of all datasets, overshadowing execution
+    of any default GraphGym dataset loader. Default GraphGym dataset loader are
+    instead called from this function, the format keywords `PyG` and `OGB` are
+    reserved for these default GraphGym loaders.
+
+    Custom transforms and dataset splitting is applied to each loaded dataset.
+
+    Args:
+        format: dataset format name that identifies Dataset class
+        name: dataset name to select from the class identified by `format`
+        dataset_dir: path where to store the processed dataset (default: ./datasets/)
+
+    Returns:
+        PyG dataset object with applied perturbation transforms and data splits
+    """
+    if format.startswith('PyG-'):
+        pyg_dataset_id = format.split('-', 1)[1]
+        dataset_dir = osp.join(dataset_dir, pyg_dataset_id)
+		
+		if pyg_dataset_id == 'Actor':
+            if name != 'none':
+                raise ValueError(f"Actor class provides only one dataset.")
+            dataset = Actor(dataset_dir)
+			
+		elif pyg_dataset_id == 'ZINC':
+            dataset = preformat_ZINC(dataset_dir, name)
+            
+        elif pyg_dataset_id == 'AQSOL':
+            dataset = preformat_AQSOL(dataset_dir, name)
+			
+	# GraphGym default loader for Pytorch Geometric datasets
+    elif format == 'PyG':
+        dataset = load_pyg(name, dataset_dir)
+
+    elif format == 'OGB':
+        if name.startswith('ogbg'):
+            dataset = preformat_OGB_Graph(dataset_dir, name.replace('_', '-'))
+        elif name.startswith('peptides-'):
+            dataset = preformat_Peptides(dataset_dir, name)
+
+    else:
+        raise ValueError(f"Unknown data format: {format}")
+
+    pre_transform_in_memory(dataset, partial(task_specific_preprocessing, cfg=cfg))
+
+    log_loaded_dataset(dataset, format, name)
+
+    # Precompute necessary statistics for positional encodings.
+    pe_enabled_list = []
+    for key, pecfg in cfg.items():
+        if key.startswith('posenc_') and pecfg.enable:
+            pe_name = key.split('_', 1)[1]
+            pe_enabled_list.append(pe_name)
+            if hasattr(pecfg, 'kernel'):
+                # Generate kernel times if functional snippet is set.
+                if pecfg.kernel.times_func:
+                    pecfg.kernel.times = list(eval(pecfg.kernel.times_func))
+                logging.info(f"Parsed {pe_name} PE kernel times / steps: "
+                             f"{pecfg.kernel.times}")
+    if pe_enabled_list:
+        start = time.perf_counter()
+        logging.info(f"Precomputing Positional Encoding statistics: "
+                     f"{pe_enabled_list} for all graphs...")
+        # Estimate directedness based on 10 graphs to save time.
+        is_undirected = all(d.is_undirected() for d in dataset[:10])
+        logging.info(f"  ...estimated to be undirected: {is_undirected}")
+        pre_transform_in_memory(dataset,
+                                partial(compute_posenc_stats,
+                                        pe_types=pe_enabled_list,
+                                        is_undirected=is_undirected,
+                                        cfg=cfg),
+                                show_progress=True
+                                )
+        elapsed = time.perf_counter() - start
+        timestr = time.strftime('%H:%M:%S', time.gmtime(elapsed)) \
+                  + f'{elapsed:.2f}'[-3:]
+        logging.info(f"Done! Took {timestr}")
+
+    # Set standard dataset train/val/test splits
+    if hasattr(dataset, 'split_idxs'):
+        set_dataset_splits(dataset, dataset.split_idxs)
+        delattr(dataset, 'split_idxs')
+
+    # Verify or generate dataset train/val/test splits
+    prepare_splits(dataset)
+
+    # Precompute in-degree histogram if needed for PNAConv.
+    if cfg.gt.layer_type.startswith('PNA') and len(cfg.gt.pna_degrees) == 0:
+        cfg.gt.pna_degrees = compute_indegree_histogram(
+            dataset[dataset.data['train_graph_index']])
+        # print(f"Indegrees: {cfg.gt.pna_degrees}")
+        # print(f"Avg:{np.mean(cfg.gt.pna_degrees)}")
+
+    return dataset
+
+1. dataset = preformat_ZINC(dataset_dir, name)
+#dataset_dir: path where to store the cached dataset
+#name: the type of dataset split:
+    #- 'peptides-functional' (10-task classification)
+    #- 'peptides-structural' (11-task regression)
+#name: name of the specific dataset in the TUDataset class
+#name: select 'subset' or 'full' version of ZINC
+
+def preformat_ZINC(dataset_dir, name):
+    """Load and preformat ZINC datasets.
+
+    Args:
+        dataset_dir: path where to store the cached dataset
+        name: select 'subset' or 'full' version of ZINC
+
+    Returns:
+        PyG dataset object
+    """
+    if name not in ['subset', 'full']:
+        raise ValueError(f"Unexpected subset choice for ZINC dataset: {name}")
+    dataset = join_dataset_splits(
+        [ZINC(root=dataset_dir, subset=(name == 'subset'), split=split)
+         for split in ['train', 'val', 'test']]
+    )
+    return dataset
+	
+	
+def join_dataset_splits(datasets):
+    """Join train, val, test datasets into one dataset object.
+
+    Args:
+        datasets: list of 3 PyG datasets to merge
+
+    Returns:
+        joint dataset with `split_idxs` property storing the split indices
+    """
+    assert len(datasets) == 3, "Expecting train, val, test datasets"
+
+    n1, n2, n3 = len(datasets[0]), len(datasets[1]), len(datasets[2])
+    data_list = [datasets[0].get(i) for i in range(n1)] + [datasets[1].get(i) for i in range(n2)] + [datasets[2].get(i) for i in range(n3)]
+
+    datasets[0]._indices = None
+    datasets[0]._data_list = data_list
+    datasets[0].data, datasets[0].slices = datasets[0].collate(data_list)
+    split_idxs = [list(range(n1)),
+                  list(range(n1, n1 + n2)),
+                  list(range(n1 + n2, n1 + n2 + n3))]
+    datasets[0].split_idxs = split_idxs
+
+    return datasets[0]
+	
+2. ZINC(root=dataset_dir, subset=(name == 'subset'), split=split)
+
+def __init__(
+        self,
+        root: str,
+        subset: bool = False,
+        split: str = 'train'
+) -> None:
+        self.subset = subset 														#Inherited from class ZINC
+        assert split in ['train', 'val', 'test']                                    #Inherited from class ZINC
+        super().__init__()                                                          #Inherited from class Dataset
+
+        if self.has_download:                                                       #Inherited from class Dataset
+            self._download()                                                        #Inherited from class Dataset
+
+		if self.has_process:                                                        #Inherited from class Dataset
+            self._process()                                                         #Inherited from class Dataset
+
+        path = osp.join(self.processed_dir, f'{split}.pt')                          #Inherited from class ZINC
+        self.load(path)                                                             #Inherited from class ZINC
+		
+		
+3. self._download()
+
+def _download(self):
+			if files_exist(self.raw_paths):  # pragma: no cover
+				return
+			fs.makedirs(self.raw_dir, exist_ok=True)
+			self.download()
+
+4. self.download(): downloads the whole dataset and the files containing the indices for train, val, test
+
+def download(self) -> None:
+        fs.rm(self.raw_dir)
+        path = download_url(self.url, self.root)
+        extract_zip(path, self.root)
+        os.rename(osp.join(self.root, 'molecules'), self.raw_dir)
+        os.unlink(path)
+
+        for split in ['train', 'val', 'test']:
+            download_url(self.split_url.format(split), self.raw_dir)
+
+
+5. self._process()
+
+def has_process(self) -> bool:
+        r"""Checks whether the dataset defines a :meth:`process` method."""
+        return overrides_method(self.__class__, 'process')
+
+def _process(self):
+        if not self.force_reload and files_exist(self.processed_paths):
+            return
+
+        fs.makedirs(self.processed_dir, exist_ok=True)
+        self.process()
+
+        path = osp.join(self.processed_dir, 'pre_transform.pt')
+        fs.torch_save(_repr(self.pre_transform), path)
+        path = osp.join(self.processed_dir, 'pre_filter.pt')
+        fs.torch_save(_repr(self.pre_filter), path)
+
+6. self.process(): creates .pt file for each split
+
+def process(self) -> None:
+        for split in ['train', 'val', 'test']:
+            with open(osp.join(self.raw_dir, f'{split}.pickle'), 'rb') as f:
+                mols = pickle.load(f)
+
+            indices = list(range(len(mols)))
+
+            if self.subset:
+                with open(osp.join(self.raw_dir, f'{split}.index')) as f:
+                    indices = [int(x) for x in f.read()[:-1].split(',')]
+
+            pbar = tqdm(total=len(indices))
+            pbar.set_description(f'Processing {split} dataset')
+
+            data_list = []
+            for idx in indices:
+                mol = mols[idx]
+
+                x = mol['atom_type'].to(torch.long).view(-1, 1)
+                y = mol['logP_SA_cycle_normalized'].to(torch.float)
+
+                adj = mol['bond_type']
+                edge_index = adj.nonzero(as_tuple=False).t().contiguous()
+                edge_attr = adj[edge_index[0], edge_index[1]].to(torch.long)
+
+                data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr,
+                            y=y)
+
+                if self.pre_filter is not None and not self.pre_filter(data):
+                    continue
+
+                if self.pre_transform is not None:
+                    data = self.pre_transform(data)
+
+                data_list.append(data)
+                pbar.update(1)
+
+            pbar.close()
+
+            self.save(data_list, osp.join(self.processed_dir, f'{split}.pt'))
+			
+			
+def save(cls, data_list: Sequence[BaseData], path: str) -> None:
+        r"""Saves a list of data objects to the file path :obj:`path`."""
+        data, slices = cls.collate(data_list)
+        fs.torch_save((data.to_dict(), slices, data.__class__), path)
+
+5. self.load(path): updates self.data, self.slices from split.pt for the split given to ZINC.__init__()
+
+def load(self, path: str, data_cls: Type[BaseData] = Data) -> None:
+        r"""Loads the dataset from the file path :obj:`path`."""
+        out = fs.torch_load(path)
+        assert isinstance(out, tuple)
+        assert len(out) == 2 or len(out) == 3
+        if len(out) == 2:  # Backward compatibility.
+            data, self.slices = out
+        else:
+            data, self.slices, data_cls = out
+
+        if not isinstance(data, dict):  # Backward compatibility.
+            self.data = data
+        else:
+            self.data = data_cls.from_dict(data)
+			
+###########################################
+Doubts:
+1. ZINC.__init__() doesn't seem to return anything but is used as a member of a list while preformat function is called
+2. (UNDERSTOOD - error coding in ZINC) ZINC.__init()__ is called for any one split, but the process() method processes and creates the .pt file for every split
+3. What does a Data object contain? What are slices?
+4. Vijay's Benchmarking paper has all the types of base GNNs that we can evaluate for and compare against. Also, check the GraphGPS paper for the GNNs evaluated and compared against.
+5. Should my VLSI-SoC trojans be only in test set?
+6. Need to personally look into each circuit in the dataset
+7. Replaced _ in the names of circuits in my TrustHub4GraphGPS dataset with - while forming the .pt graph files
+###########################################
+DataLoader for MyTrojan Dataset
+###########################################
+1. Automated conversion of verilog files to graphs using PyVerilog
+
+Option 1: Create train.pickle, val.pickle, test.pickle
+Option 2: Create just one file containing all the graphs
+In trojan detection, the test set should have only unseen circuits. So, there are many combinations of train, val, test sets
+But, for now, just take one circuit as test and split accordingly. 
+
+Go to each folder. Convert `top.v` to graph. Save it in the same folder. Name and class are the main things to store. 
+
+Go for option 1 and follow AQSOl style.
+-------------------------
+2. download(): download and unzip
+
+
+-------------------------
+3. process(): create train.pt, val.pt, test.pt
+
+eventual dataset form for processing by GraphGPS
+for every split.pickle file in raw_dir, create a split.pt in processed_dir. Each split.pt file contains a python list of graphs (as `Data` objects).
+-------------------------
+4. preformat_MyTrojans()
+
+
+
+def preformat_MyTrojans():
+    """Load and preformat AQSOL datasets.
+
+    Args:
+        dataset_dir: path where to store the cached dataset
+
+    Returns:
+        PyG dataset object
+    """
+    dataset = join_dataset_splits(
+        [MyTrojans(split=split)
+         for split in ['train', 'val', 'test']]
+    )
+    return dataset
+	
+	
+
+
+
+

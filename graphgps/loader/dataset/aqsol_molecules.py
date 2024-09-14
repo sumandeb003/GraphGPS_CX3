@@ -129,5 +129,5 @@ class AQSOL(InMemoryDataset):
                 pbar.update(1)
 
             pbar.close()
-            torch.save(self.collate(data_list),
+            torch.save(self.collate(data_list), 
                        osp.join(self.processed_dir, f'{split}.pt'))

@@ -2,11 +2,10 @@ import datetime
 import os
 import torch
 import logging
-
 import graphgps  # noqa, register custom modules
 from graphgps.agg_runs import agg_runs
 from graphgps.optimizer.extra_optimizers import ExtendedSchedulerConfig
-
+import torch_geometric.graphgym.register as register
 from torch_geometric.graphgym.cmd_args import parse_args
 from torch_geometric.graphgym.config import (cfg, dump_cfg,
                                              set_cfg, load_cfg,
@@ -116,8 +115,11 @@ def run_loop_settings():
 if __name__ == '__main__':
     # Load cmd line args
     args = parse_args()
-    # Load config file
+    ## Load config file
     set_cfg(cfg)
+    #for func in register.config_dict.values():
+    	#print(f'register.config_dict.values:{func(cfg)}')
+    #print (f'CFG:{cfg}')    
     load_cfg(cfg, args)
     custom_set_out_dir(cfg, args.cfg_file, cfg.name_tag)
     dump_cfg(cfg)
@@ -135,21 +137,27 @@ if __name__ == '__main__':
         auto_select_device()
         if cfg.pretrained.dir:
             cfg = load_pretrained_model_cfg(cfg)
+            #print(f'cfg:{cfg}')#prints the configurations of the pretrained model
         logging.info(f"[*] Run ID {run_id}: seed={cfg.seed}, "
                      f"split_index={cfg.dataset.split_index}")
         logging.info(f"    Starting now: {datetime.datetime.now()}")
         # Set machine learning pipeline
         loaders = create_loader()
+        #print(f'loaders:{loaders}')
         loggers = create_logger()
+        #print(f'loggers:{loggers}')
         model = create_model()
         if cfg.pretrained.dir:
             model = init_model_from_pretrained(
                 model, cfg.pretrained.dir, cfg.pretrained.freeze_main,
                 cfg.pretrained.reset_prediction_head, seed=cfg.seed
             )
+            #print(f'model:{model}')
         optimizer = create_optimizer(model.parameters(),
                                      new_optimizer_config(cfg))
+        #print(f'optimizer:{optimizer}')
         scheduler = create_scheduler(optimizer, new_scheduler_config(cfg))
+        #print(f'scheduler:{scheduler}')
         # Print model info
         logging.info(model)
         logging.info(cfg)
@@ -163,8 +171,7 @@ if __name__ == '__main__':
             datamodule = GraphGymDataModule()
             train(model, datamodule, logger=True)
         else:
-            train_dict[cfg.train.mode](loggers, loaders, model, optimizer,
-                                       scheduler)
+            train_dict[cfg.train.mode](loggers, loaders, model, optimizer,scheduler)
     # Aggregate results from different seeds
     try:
         agg_runs(cfg.out_dir, cfg.metric_best)

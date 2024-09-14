@@ -13,7 +13,8 @@ from torch_geometric.datasets import (Actor, GNNBenchmarkDataset, Planetoid,
 from torch_geometric.graphgym.config import cfg
 from torch_geometric.graphgym.loader import load_pyg, load_ogb, set_dataset_attr
 from torch_geometric.graphgym.register import register_loader
-
+from graphgps.loader.dataset.mykarateclub import MyKarateClub
+from graphgps.loader.dataset.mytrojans import MyTrojans
 from graphgps.loader.dataset.aqsol_molecules import AQSOL
 from graphgps.loader.dataset.coco_superpixels import COCOSuperpixels
 from graphgps.loader.dataset.malnet_tiny import MalNetTiny
@@ -79,7 +80,7 @@ def log_loaded_dataset(dataset, format, name):
     #     )
 
 
-@register_loader('custom_master_loader')
+@register_loader('custom_master_loader')#Registers a custom data loader - here, 'load_dataset_master'
 def load_dataset_master(format, name, dataset_dir):
     """
     Master loader that controls loading of all datasets, overshadowing execution
@@ -132,6 +133,12 @@ def load_dataset_master(format, name, dataset_dir):
             
         elif pyg_dataset_id == 'AQSOL':
             dataset = preformat_AQSOL(dataset_dir, name)
+            
+        elif pyg_dataset_id == 'MyKarateClub':
+        	dataset = MyKarateClub()
+        	
+        elif pyg_dataset_id == 'MyTrojans':
+        	dataset = preformat_MyTrojans()
 
         elif pyg_dataset_id == 'VOCSuperpixels':
             dataset = preformat_VOCSuperpixels(dataset_dir, name,
@@ -562,6 +569,21 @@ def preformat_ZINC(dataset_dir, name):
     )
     return dataset
 
+
+def preformat_MyTrojans():
+    """Load and preformat AQSOL datasets.
+
+    Args:
+        dataset_dir: path where to store the cached dataset
+
+    Returns:
+        PyG dataset object
+    """
+    dataset = join_dataset_splits(
+        [MyTrojans(split=split)
+         for split in ['train', 'val', 'test']]
+    )
+    return dataset
 
 def preformat_AQSOL(dataset_dir):
     """Load and preformat AQSOL datasets.
