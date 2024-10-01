@@ -35,7 +35,7 @@ class TrustHubGraphDataset(InMemoryDataset):
     ):
         self.name = name
         
-        trusthub_dict = ['TrustHubDFG': 'DFG', 'TrustHubCFG': 'CFG', 'TrustHubAST': 'AST']
+        trusthub_dict = {'TrustHubDFG': 'DFG', 'TrustHubCFG': 'CFG', 'TrustHubAST': 'AST'}
         self.graphtype = root.split('/')[-1]
         assert self.graphtype in trusthub_dict
         self.graphtype = trusthub_dict[self.graphtype]
