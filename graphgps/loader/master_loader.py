@@ -14,7 +14,7 @@ from torch_geometric.graphgym.config import cfg
 from torch_geometric.graphgym.loader import load_pyg, load_ogb, set_dataset_attr
 from torch_geometric.graphgym.register import register_loader
 from graphgps.loader.dataset.mykarateclub import MyKarateClub
-from graphgps.loader.dataset.mytrojans import MyTrojans
+from graphgps.loader.dataset.TrustHubGraphDataset import TrustHubGraphDataset
 from graphgps.loader.dataset.aqsol_molecules import AQSOL
 from graphgps.loader.dataset.coco_superpixels import COCOSuperpixels
 from graphgps.loader.dataset.malnet_tiny import MalNetTiny
@@ -137,8 +137,8 @@ def load_dataset_master(format, name, dataset_dir):
         elif pyg_dataset_id == 'MyKarateClub':
         	dataset = MyKarateClub()
         	
-        elif pyg_dataset_id == 'MyTrojans':
-        	dataset = preformat_MyTrojans()
+        elif pyg_dataset_id in ['TrustHubDFG', 'TrustHubCFG', 'TrustHubAST']:
+        	dataset = preformat_TrustHubGraphDataset(dataset_dir, name)
 
         elif pyg_dataset_id == 'VOCSuperpixels':
             dataset = preformat_VOCSuperpixels(dataset_dir, name,
@@ -570,7 +570,7 @@ def preformat_ZINC(dataset_dir, name):
     return dataset
 
 
-def preformat_MyTrojans():
+def preformat_TrustHubGraphDataset(dataset_dir, name):
     """Load and preformat AQSOL datasets.
 
     Args:
@@ -580,10 +580,11 @@ def preformat_MyTrojans():
         PyG dataset object
     """
     dataset = join_dataset_splits(
-        [MyTrojans(split=split)
+        [TrustHubGraphDataset(root = dataset_dir, name = name, split = split)
          for split in ['train', 'val', 'test']]
     )
     return dataset
+
 
 def preformat_AQSOL(dataset_dir):
     """Load and preformat AQSOL datasets.
