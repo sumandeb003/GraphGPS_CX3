@@ -3,7 +3,7 @@ import os.path as osp
 from typing import Callable, List, Optional
 
 import torch
-from zipfile import ZipFile
+import zipfile
 
 import gdown
 
