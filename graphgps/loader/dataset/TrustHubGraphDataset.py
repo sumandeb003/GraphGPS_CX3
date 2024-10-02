@@ -110,6 +110,8 @@ class TrustHubGraphDataset(InMemoryDataset):
     # Include CFG***(TIER 3)
     #############################################################
     # Node-level trojan detection (LAST)
+    #############################################################
+    # When you change zip file uploaded in Google Drive, you need to update the gdrive_id and the lists TjIn and TjFree in self.raw_file_names()
     
     def process(self) -> None: #creates 3 splits - train.pt, val.pt, test.pt - and can be used with the `join_dataset_splits()` method in master_loader.py
         
@@ -123,7 +125,6 @@ class TrustHubGraphDataset(InMemoryDataset):
         
         val = re.search('val\[(.*)\].', self.name).group(1)
         test = re.search('.test\[(.*)\]', self.name).group(1)
-        print ('TEST: ', test)
         
         train_list = []
         val_list = []
