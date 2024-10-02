@@ -66,8 +66,8 @@ class TrustHubGraphDataset(InMemoryDataset):
     def processed_file_names(self) -> List[str]: 
         #ToDo: processed_file_names(): make provision for different leave-one-out train, test and validation sets****
         
-        val = re.search('val\[(.*)\].', self.dataset.name)
-        test = re.search('test\[(.*)\]', self.dataset.name)
+        val = re.search('val\[(.*)\].', self.name)
+        test = re.search('test\[(.*)\]', self.name)
         
         return [f'train___{self.graphtype}.pt', f'val___{self.graphtype}___{val}.pt', f'test___{self.graphtype}___{test}.pt']
 
@@ -120,8 +120,8 @@ class TrustHubGraphDataset(InMemoryDataset):
         #cfg.dataset.name: val[ckt_name].test[ckt_name]. val[] can be empty
         #ToDo: processed_file_names(): make provision for different leave-one-out train, test and validation sets****
         
-        val = re.search('val\[(.*)\].', self.dataset.name)
-        test = re.search('test\[(.*)\]', self.dataset.name)
+        val = re.search('val\[(.*)\].', self.name)
+        test = re.search('test\[(.*)\]', self.name)
         
         train_list = []
         val_list = []
