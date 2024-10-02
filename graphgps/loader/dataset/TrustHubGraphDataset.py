@@ -123,6 +123,7 @@ class TrustHubGraphDataset(InMemoryDataset):
         
         val = re.search('val\[(.*)\].', self.name).group(1)
         test = re.search('.test\[(.*)\]', self.name).group(1)
+        print ('TEST: ', test)
         
         train_list = []
         val_list = []
