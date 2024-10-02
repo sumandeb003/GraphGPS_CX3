@@ -143,9 +143,9 @@ class TrustHubGraphDataset(InMemoryDataset):
                  
             if graph.name == val:
                 val_list.append(graph)
-            elif graph.name == test:
+            if graph.name == test:
                 test_list.append(graph)
-            else:
+            if graph.name != val and graph.name != test:
                 train_list.append(graph)
             
         self.save(val_list, osp.join(self.processed_dir, f'val___{self.graphtype}___{val}.pt'))
