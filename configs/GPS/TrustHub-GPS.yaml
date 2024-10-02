@@ -25,7 +25,7 @@ posenc_LapPE:
     eigvec_norm: L2
     max_freqs: 8
   model: DeepSet
-  dim_pe: 8
+  dim_pe: 2
   layers: 2
   raw_norm_type: none
 train:
