@@ -1,7 +1,7 @@
 out_dir: results
 metric_best: accuracy # originally: mae
 metric_agg: argmin
-encoderSS:
+encoder:
     dim_in: 64
 wandb:
   use: True
