@@ -28,7 +28,8 @@ train:
 model:
   type: GPSModel
   loss_fun: cross_entropy
-
+gnn:
+    dim_inner: 64
 
 optim:
   clip_grad_norm: True
