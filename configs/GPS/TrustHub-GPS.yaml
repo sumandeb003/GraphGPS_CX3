@@ -1,8 +1,7 @@
 out_dir: results
 metric_best: accuracy # originally: mae
 metric_agg: argmin
-encoder:
-    dim_in: 64
+
 wandb:
   use: True
   project: TrustHubDFG
