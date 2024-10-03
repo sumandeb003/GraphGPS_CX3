@@ -20,16 +20,13 @@ dataset:
   edge_encoder_bn: False
 
 train:
-  mode: custom
+  mode: standard
   sampler: full_batch
 #  sampler: saint_rw
 #  batch_size: 32
   eval_period: 1
   enable_ckpt: False
 #  ckpt_period: 100
-model:
-  type: GPSModel
-  loss_fun: cross_entropy
 gnn:
     dim_inner: 64
 
