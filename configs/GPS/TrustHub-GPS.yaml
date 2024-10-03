@@ -29,7 +29,7 @@ posenc_LapPE:
   layers: 2
   raw_norm_type: none
 train:
-  mode: standard
+  mode: custom #because GPSModel is custom and not standard to Graphgym
   batch_size: 1 #originally, 32
   eval_period: 1
   ckpt_period: 100
