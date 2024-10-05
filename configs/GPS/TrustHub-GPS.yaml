@@ -9,7 +9,7 @@ dataset:
   name: val[xtea].test[xtea] #custom for TrustHub
   task: graph
   task_type: classification
-  transductive: True
+  transductive: False
   split_mode: standard
   node_encoder: False
 #  node_encoder_name: LinearNode+GraphormerBias
