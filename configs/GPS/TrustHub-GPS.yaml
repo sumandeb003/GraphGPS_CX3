@@ -18,7 +18,7 @@ dataset:
   edge_encoder_bn: False
 train:
   mode: custom
-  batch_size: 256
+  batch_size: 1
   eval_period: 1
   ckpt_period: 100
 model:
