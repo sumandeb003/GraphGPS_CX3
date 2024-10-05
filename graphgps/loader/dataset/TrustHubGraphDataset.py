@@ -143,7 +143,10 @@ class TrustHubGraphDataset(InMemoryDataset):
             print('Graph is coalesced: ', graph.is_coalesced())
             print('Graph is directed: ', graph.is_directed())
             for key in graph.to_dict().keys():
-                print('Shape of graph.',key,': ', graph.to_dict()[key].shape)
+                try:
+                    print('Shape of graph.',key,': ', graph.to_dict()[key].shape)
+                except:
+                    pass
             print('============================================================')
             if graph.edge_index.numel() == 0:
                 continue  # Skipping for graphs with no bonds/edges.
@@ -168,7 +171,4 @@ class TrustHubGraphDataset(InMemoryDataset):
         self.save(train_list, osp.join(self.processed_dir, f'train___{self.graphtype}.pt'))
 
 
-# download(): raw_dir, root, os.rename
-# raw_file_names(): make provision for different graph types (DONE)
-# processed_file_names(): make provision for different leave-one-out train, test and validation sets****
-# process(): 
+
