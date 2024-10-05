@@ -583,6 +583,7 @@ def preformat_TrustHubGraphDataset(dataset_dir, name):
         [TrustHubGraphDataset(root = dataset_dir, name = name, split = split)
          for split in ['train', 'val', 'test']]
     )
+    print('Inside master_loader.preformat_TrustHubGraphDataset()')
     return dataset
 
 
