@@ -132,7 +132,19 @@ class TrustHubGraphDataset(InMemoryDataset):
         
         for raw_path in self.raw_paths:
             graph = torch.load(raw_path)
-            
+            print('============================================================')
+            print('Processing graph: ', graph)
+            print('Number of nodes: ', graph.num_nodes)
+            print('Number of node features: ', graph.num_node_features)
+            print('Number of edges: ', graph.num_edges)
+            print('Number of edge features: ', graph.num_edge_features)
+            print('Graph has isolated nodes: ', graph.has_isolated_nodes())
+            print('Graph has self loops: ', graph.has_self_loops())
+            print('Graph is coalesced: ', graph.is_coalesced())
+            print('Graph is directed: ', graph.is_directed())
+            for key in graph.to_dict().keys():
+                print('Shape of graph.',key,': ', graph.to_dict()[key].shape)
+            print('============================================================')
             if graph.edge_index.numel() == 0:
                 continue  # Skipping for graphs with no bonds/edges.
 
