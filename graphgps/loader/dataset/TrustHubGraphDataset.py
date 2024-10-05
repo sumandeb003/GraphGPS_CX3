@@ -1,3 +1,7 @@
+# Key Points Before Running this file: 
+# When you change zip file uploaded in Google Drive, you need to update the gdrive_id and the lists TjIn and TjFree in self.raw_file_names()
+# In order to ensure that the download() and process() methods are run, remove the folder containing raw and processed directories
+
 import os, re
 import os.path as osp
 from typing import Callable, List, Optional
@@ -111,7 +115,7 @@ class TrustHubGraphDataset(InMemoryDataset):
     #############################################################
     # Node-level trojan detection (LAST)
     #############################################################
-    # When you change zip file uploaded in Google Drive, you need to update the gdrive_id and the lists TjIn and TjFree in self.raw_file_names()
+    
     
     def process(self) -> None: #creates 3 splits - train.pt, val.pt, test.pt - and can be used with the `join_dataset_splits()` method in master_loader.py
         
@@ -147,6 +151,8 @@ class TrustHubGraphDataset(InMemoryDataset):
                     print('Shape of graph.',key,': ', graph.to_dict()[key].shape)
                 except:
                     pass
+            if graph.to_dict()['x'].shape != (graph.num_nodes,graph.num_node_features)
+                graph.x = torch.reshape(graph.x, (graph.num_nodes,graph.num_node_features))
             print('============================================================')
             if graph.edge_index.numel() == 0:
                 continue  # Skipping for graphs with no bonds/edges.
