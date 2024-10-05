@@ -142,6 +142,8 @@ class TrustHubGraphDataset(InMemoryDataset):
             if self.pre_transform is not None:
                 graph = self.pre_transform(graph)
                  
+            
+            
             if graph.name == val:
                 val_list.append(graph)
             if graph.name == test:
