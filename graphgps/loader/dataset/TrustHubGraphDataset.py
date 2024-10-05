@@ -151,6 +151,7 @@ class TrustHubGraphDataset(InMemoryDataset):
                     print('Shape of graph.',key,': ', graph.to_dict()[key].shape)
                 except:
                     pass
+            graph.x = graph.x.float()
             if graph.to_dict()['x'].shape != (graph.num_nodes,graph.num_node_features):
                 graph.x = torch.reshape(graph.x, (graph.num_nodes,graph.num_node_features))
             print('============================================================')
