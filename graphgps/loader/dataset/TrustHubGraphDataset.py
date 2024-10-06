@@ -27,7 +27,7 @@ from torch_geometric.io import fs
 
 
 class TrustHubGraphDataset(InMemoryDataset):
-    gdrive_id = {'DFG': '1OrGfX9PIbeMkV045Dv-YqaZhL85-gs48', 'CFG': '', 'AST': '1kav8vMtQO4ekdfy976swnurw_-52R89w'}
+    gdrive_id = {'DFG': '1RQTcAccNtBLNSQs5gf7KIOXHtSlVZZUG', 'CFG': '', 'AST': '1kav8vMtQO4ekdfy976swnurw_-52R89w'}
     url = ''
 
     def __init__(
