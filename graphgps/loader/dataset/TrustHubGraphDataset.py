@@ -93,7 +93,7 @@ class TrustHubGraphDataset(InMemoryDataset):
         
         with zipfile.ZipFile(dwnld_path,'r') as zip_file:
                 file_list = zip_file.namelist()
-                zip_file.extractall(self.raw)
+                zip_file.extractall(self.raw_dir)
         
         #print('file_list: ',file_list)
         #extracted_folder = file_list[0].split('/')[-2]#extracts the name of the topmost folder extracted. Example name of this folder: TrustHubDFGs. This folder needs to be renamed as 'raw'
