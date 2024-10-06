@@ -63,6 +63,7 @@ class CustomLogger(Logger):
     # task properties
     def classification_binary(self):
         true = torch.cat(self._true).squeeze(-1)
+        print('TRUE: ',true)
         pred_score = torch.cat(self._pred)
         pred_int = self._get_pred_int(pred_score)
 
