@@ -146,13 +146,13 @@ class TrustHubGraphDataset(InMemoryDataset):
             print('Graph has self loops: ', graph.has_self_loops())
             print('Graph is coalesced: ', graph.is_coalesced())
             print('Graph is directed: ', graph.is_directed())
-            graph.y = graph.label # Included in TrustHub2graph.py. So, remove
+            graph.y = torch.tensor(graph.label) # Included in TrustHub2graph.py. So, remove
             graph.x = graph.x.float() # Included in TrustHub2graph.py. So, remove
             if graph.to_dict()['x'].shape != (graph.num_nodes,graph.num_node_features): # Included in TrustHub2graph.py. So, remove
                 graph.x = torch.reshape(graph.x, (graph.num_nodes,graph.num_node_features)) # Included in TrustHub2graph.py. So, remove
             for key in graph.to_dict().keys():
                 try:
-                    print('Shape of graph.',key,': ', graph.to_dict()[key].shape)
+                    print(f'Shape of graph.{key}: {graph.to_dict()[key].shape}')
                 except:
                     pass
             print('============================================================')
