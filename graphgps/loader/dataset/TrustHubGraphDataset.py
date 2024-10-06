@@ -1,6 +1,7 @@
 # Key Points Before Running this file: 
 # When you change zip file uploaded in Google Drive, you need to update the gdrive_id and the lists TjIn and TjFree in self.raw_file_names()
 # In order to ensure that the download() and process() methods are run, remove the folder containing raw and processed directories: rm -r TrustHubDFG/
+# adjust the .yaml config file, if needed
 # python main.py --cfg configs/GPS/zinc-GPS+RWSE.yaml  wandb.use False
 
 import os, re
