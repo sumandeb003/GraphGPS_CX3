@@ -1,6 +1,7 @@
 # Key Points Before Running this file: 
 # When you change zip file uploaded in Google Drive, you need to update the gdrive_id and the lists TjIn and TjFree in self.raw_file_names()
-# In order to ensure that the download() and process() methods are run, remove the folder containing raw and processed directories
+# In order to ensure that the download() and process() methods are run, remove the folder containing raw and processed directories: rm -r TrustHubDFG/
+# python main.py --cfg configs/GPS/zinc-GPS+RWSE.yaml  wandb.use False
 
 import os, re
 import os.path as osp
@@ -92,7 +93,8 @@ class TrustHubGraphDataset(InMemoryDataset):
         with zipfile.ZipFile(dwnld_path,'r') as zip_file:
                 file_list = zip_file.namelist()
                 zip_file.extractall(self.root)
-                
+        
+        print('file_list: ',file_list)
         extracted_folder = file_list[0].split('/')[-2]#extracts the name of the topmost folder extracted. Example name of this folder: TrustHubDFGs. This folder needs to be renamed as 'raw'
         #extract_zip(path, self.root) #the dataset is extracted into the 'self.root' directory as a folder whose name, as per TrustHub2graph.py, will be 'DFG' or 'AST' or 'CFG'
         #cmd = 'unzip -j ' + path +' -d ' + extracted_folder 
