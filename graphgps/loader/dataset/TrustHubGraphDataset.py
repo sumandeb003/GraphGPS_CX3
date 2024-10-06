@@ -89,18 +89,18 @@ class TrustHubGraphDataset(InMemoryDataset):
         dwnld_file = 'TrustHub' + self.graphtype + '.zip'
         dwnld_path = os.path.join(self.root, dwnld_file)
         gdown.download(self.url, dwnld_path) #download zip file from Google Drive into the 'self.root' directory. This zip file will have no folders inside it but only the .pt files representing graphs of different circuits.
-        #path = download_url(self.url, self.root) 
+        #path = download_url(self.url, self.root)
         
         with zipfile.ZipFile(dwnld_path,'r') as zip_file:
                 file_list = zip_file.namelist()
-                zip_file.extractall(self.root)
+                zip_file.extractall(self.raw)
         
-        print('file_list: ',file_list)
-        extracted_folder = file_list[0].split('/')[-2]#extracts the name of the topmost folder extracted. Example name of this folder: TrustHubDFGs. This folder needs to be renamed as 'raw'
+        #print('file_list: ',file_list)
+        #extracted_folder = file_list[0].split('/')[-2]#extracts the name of the topmost folder extracted. Example name of this folder: TrustHubDFGs. This folder needs to be renamed as 'raw'
         #extract_zip(path, self.root) #the dataset is extracted into the 'self.root' directory as a folder whose name, as per TrustHub2graph.py, will be 'DFG' or 'AST' or 'CFG'
         #cmd = 'unzip -j ' + path +' -d ' + extracted_folder 
         #os.system(cmd)
-        os.rename(osp.join(self.root, extracted_folder), self.raw_dir)#'root' has 'raw','processed' directories. #this 
+        #os.rename(osp.join(self.root, extracted_folder), self.raw_dir) #'root' has 'raw','processed' directories. #this 
         os.unlink(dwnld_path) #removes the downloaded zip file after extraction
     
     # To Do:
