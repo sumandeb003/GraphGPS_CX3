@@ -24,9 +24,7 @@ train:
 model:
   type: gnn
   loss_fun: cross_entropy
-  edge_decoding: dot
 gnn:
-  head: inductive_edge
   layers_pre_mp: 0
   layers_mp: 5
   layers_post_mp: 1
