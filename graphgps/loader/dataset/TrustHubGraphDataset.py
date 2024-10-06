@@ -1,7 +1,8 @@
 # Key Points Before Running this file: 
 # When you change zip file uploaded in Google Drive, you need to update the gdrive_id and the lists TjIn and TjFree in self.raw_file_names()
-# In order to ensure that the download() and process() methods are run, remove the folder containing raw and processed directories: rm -r TrustHubDFG/
 # adjust the .yaml config file, if needed
+#git pull origin main
+# In order to ensure that the download() and process() methods are run, remove the folder containing raw and processed directories: rm -r TrustHubDFG/
 # conda activate graphgps
 # python main.py --cfg configs/GPS/zinc-GPS+RWSE.yaml  wandb.use False
 
@@ -16,7 +17,7 @@ import gdown
 
 #TrustHubDFGs.zip: https://drive.google.com/file/d/16JGsn7HaYBVLzQNdUsrovRppVqqz2Nl8/view?usp=sharing
 #TrustHubASTs.zip: https://drive.google.com/file/d/1kav8vMtQO4ekdfy976swnurw_-52R89w/view?usp=sharing
-
+https://drive.google.com/file/d/1JbHV8NzICAJHM0llN3Crt1i-CU9Rr8KV/view?usp=drive_link
 from torch_geometric.data import (
     Data,
     InMemoryDataset,
@@ -27,7 +28,8 @@ from torch_geometric.io import fs
 
 
 class TrustHubGraphDataset(InMemoryDataset):
-    gdrive_id = {'DFG': '1RQTcAccNtBLNSQs5gf7KIOXHtSlVZZUG', 'CFG': '', 'AST': '1kav8vMtQO4ekdfy976swnurw_-52R89w'}
+    gdrive_id_DFG_old = '1RQTcAccNtBLNSQs5gf7KIOXHtSlVZZUG'
+    gdrive_id = {'DFG': '1JbHV8NzICAJHM0llN3Crt1i-CU9Rr8KV', 'CFG': '', 'AST': '1kav8vMtQO4ekdfy976swnurw_-52R89w'}
     url = ''
 
     def __init__(
